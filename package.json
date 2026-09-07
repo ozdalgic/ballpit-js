@@ -1,0 +1,48 @@
+{
+  "name": "ballpit-js",
+  "version": "0.1.0",
+  "description": "An interactive pit of spheres for hero sections — Verlet physics, cursor interaction, three.js.",
+  "type": "module",
+  "main": "src/ballpit.js",
+  "module": "src/ballpit.js",
+  "exports": {
+    ".": "./src/ballpit.js"
+  },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "demo": "python3 -m http.server 8778"
+  },
+  "keywords": [
+    "three",
+    "threejs",
+    "webgl",
+    "physics",
+    "verlet",
+    "hero",
+    "background",
+    "interactive",
+    "spheres",
+    "ballpit"
+  ],
+  "author": "Aytaç Özdalgıç <ozdalgic@gmail.com> (https://ozdalgic.com)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ozdalgic/ballpit-js.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ozdalgic/ballpit-js/issues"
+  },
+  "homepage": "https://github.com/ozdalgic/ballpit-js#readme",
+  "peerDependencies": {
+    "three": ">=0.150.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
