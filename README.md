@@ -23,9 +23,13 @@ It was built for [ozdalgic.com](https://ozdalgic.com) and pulled out into a libr
 
 ## Install
 
+Not on npm yet — install from the repository:
+
 ```bash
-npm install ballpit-js three
+npm install github:ozdalgic/ballpit-js three
 ```
+
+Or just copy `src/ballpit.js` into your project; it is a single dependency-free module apart from three.
 
 The module imports the bare specifier `three`, so a bundler resolves it for you. Without a build step, add an import map:
 
