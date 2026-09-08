@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ballpit-js — an interactive pit of spheres for hero sections</title>
+    <meta
+      name="description"
+      content="A hero background made of spheres that stack, settle and scatter under the cursor. Verlet physics, three.js, one function, MIT."
+    />
+    <link rel="canonical" href="https://ozdalgic.github.io/ballpit-js/" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="ballpit-js" />
+    <meta
+      property="og:description"
+      content="An interactive pit of spheres for hero sections. Balls rain in, settle into a real pile, and scatter under your cursor."
+    />
+    <meta property="og:url" content="https://ozdalgic.github.io/ballpit-js/" />
+    <meta property="og:image" content="https://ozdalgic.github.io/ballpit-js/docs/preview.jpg" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='11' cy='21' r='9' fill='%232957ff'/%3E%3Ccircle cx='23' cy='24' r='6' fill='%2300509f'/%3E%3Ccircle cx='21' cy='10' r='7' fill='%23eaf1ff'/%3E%3C/svg%3E"
+    />
+
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #040a10;
+        --panel: #0a121c;
+        --line: #1b2836;
+        --ink: #fafafa;
+        --muted: #8ea3c9;
+        --accent: #2957ff;
+        --accent-soft: rgba(41, 87, 255, 0.14);
+        --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+      }
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          Helvetica, Arial, sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      a { color: inherit; }
+      .wrap { max-width: 940px; margin: 0 auto; padding: 0 clamp(20px, 5vw, 40px); }
+
+      /* ---------- hero ---------- */
+      .hero {
+        position: relative;
+        min-height: min(86vh, 760px);
+        display: flex;
+        align-items: center;
+        overflow: hidden;
+        border-bottom: 1px solid var(--line);
+      }
+      /* The pit fills the section and sits behind the copy. */
+      #pit { position: absolute; inset: 0; z-index: 0; }
+      /* The pile occupies roughly the bottom 200px of the hero, so the copy is
+         centred in the space above it rather than in the section as a whole. */
+      .hero .wrap { position: relative; z-index: 1; width: 100%; padding-bottom: 150px; }
+      .hero__copy {
+        max-width: 30rem;
+        margin-left: auto;
+        /* Let the cursor reach the balls everywhere except on real controls. */
+        pointer-events: none;
+      }
+      .hero__copy a, .hero__copy code { pointer-events: auto; }
+
+      .eyebrow {
+        font-family: var(--mono);
+        font-size: 0.78rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin: 0 0 14px;
+      }
+      h1 {
+        font-size: clamp(2.6rem, 6vw, 4rem);
+        line-height: 1.02;
+        letter-spacing: -0.03em;
+        margin: 0 0 0.45em;
+        font-weight: 700;
+      }
+      .lede { color: #c8d6f0; font-size: 1.06rem; margin: 0 0 1.7em; }
+      .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 11px 20px;
+        border-radius: 999px;
+        text-decoration: none;
+        font-size: 0.94rem;
+        font-weight: 500;
+        border: 1px solid transparent;
+        transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+      }
+      .btn:hover { transform: translateY(-1px); }
+      .btn--solid { background: var(--accent); color: #040a10; }
+      .btn--ghost { border-color: #2b3a4d; color: var(--ink); }
+      .btn--ghost:hover { border-color: #4a6180; }
+      .hint {
+        margin: 22px 0 0;
+        font-size: 0.86rem;
+        color: var(--muted);
+      }
+
+      /* ---------- sections ---------- */
+      section.band { padding: clamp(56px, 9vw, 96px) 0; border-bottom: 1px solid var(--line); }
+      section.band:last-of-type { border-bottom: 0; }
+      h2 {
+        font-size: clamp(1.5rem, 3vw, 1.9rem);
+        letter-spacing: -0.02em;
+        margin: 0 0 0.7em;
+      }
+      h3 { font-size: 1.05rem; margin: 0 0 0.4em; letter-spacing: -0.01em; }
+      p { margin: 0 0 1.1em; }
+      p.muted, li.muted { color: var(--muted); }
+
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 20px;
+        margin-top: 34px;
+      }
+      .card {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 22px;
+        background: var(--panel);
+      }
+      .card p { margin: 0; color: var(--muted); font-size: 0.94rem; }
+
+      pre {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 18px 20px;
+        overflow-x: auto;
+        font-family: var(--mono);
+        font-size: 0.86rem;
+        line-height: 1.6;
+        margin: 0 0 18px;
+      }
+      code {
+        font-family: var(--mono);
+        font-size: 0.88em;
+      }
+      :not(pre) > code {
+        background: var(--accent-soft);
+        border: 1px solid rgba(41, 87, 255, 0.28);
+        border-radius: 5px;
+        padding: 1px 6px;
+      }
+      .tok-c { color: #64809f; }
+      .tok-s { color: #7fd6a5; }
+      .tok-k { color: #7aa2ff; }
+      .tok-n { color: #d9a45b; }
+
+      .scroller { overflow-x: auto; margin: 0 0 18px; }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        min-width: 560px;
+        font-size: 0.9rem;
+      }
+      th, td {
+        text-align: left;
+        padding: 11px 14px;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+      }
+      th { color: var(--muted); font-weight: 500; font-size: 0.82rem; letter-spacing: 0.04em; text-transform: uppercase; }
+      td:first-child { font-family: var(--mono); font-size: 0.84rem; white-space: nowrap; color: #cfe0ff; }
+      td.plain { font-family: inherit; font-size: 0.9rem; white-space: normal; color: inherit; }
+
+      figure { margin: 30px 0 0; }
+      figure img {
+        width: 100%;
+        display: block;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+      }
+      figcaption { color: var(--muted); font-size: 0.86rem; margin-top: 10px; }
+
+      footer {
+        padding: 40px 0 60px;
+        color: var(--muted);
+        font-size: 0.9rem;
+        border-top: 1px solid var(--line);
+      }
+      footer a { color: #cfe0ff; }
+
+      @media (max-width: 760px) {
+        /* No cursor to push the pile with, and no panel at this width. */
+        .only-wide { display: none; }
+        .hero { min-height: 78vh; }
+        /* The narrow pit runs 42 small balls, so the bed is ~120px deep. */
+        .hero .wrap { padding-bottom: 40px; }
+        .hero__copy { margin-left: 0; max-width: none; }
+      }
+    </style>
+
+    <!-- The library imports the bare specifier "three"; this map resolves it. -->
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.181.2/build/three.module.js"
+        }
+      }
+    </script>
+  </head>
+
+  <body>
+    <header class="hero">
+      <div id="pit" aria-hidden="true"></div>
+      <div class="wrap">
+        <div class="hero__copy">
+          <p class="eyebrow">MIT · three.js · ~10&nbsp;KB gzipped</p>
+          <h1>ballpit-js</h1>
+          <p class="lede">
+            A hero background that pushes back. Spheres rain into the container,
+            settle into a real pile, and scatter when your cursor drags through
+            them.
+          </p>
+          <div class="actions">
+            <a class="btn btn--solid" href="https://github.com/ozdalgic/ballpit-js">
+              View on GitHub
+            </a>
+            <a class="btn btn--ghost" href="#install">Install</a>
+          </div>
+          <p class="hint">
+            You are looking at it.
+            <span class="only-wide">
+              Drag your cursor through the pile; the panel top-left is the
+              built-in tuning UI.
+            </span>
+          </p>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="band" id="why">
+        <div class="wrap">
+          <h2>Why it exists</h2>
+          <p>
+            Most decorative hero backgrounds are a looping video or a shader:
+            pretty, but nothing happens when you touch them. This one is a small
+            physics world. The balls stack on each other, hold their shape, and
+            remember where you shoved them — so a visitor has something to fiddle
+            with instead of scrolling straight past.
+          </p>
+          <p class="muted">
+            Built for <a href="https://ozdalgic.com">ozdalgic.com</a> and pulled
+            out into a library afterwards.
+          </p>
+
+          <div class="cards">
+            <div class="card">
+              <h3>One function</h3>
+              <p>
+                No canvas framework to learn and no physics engine to bundle.
+                Point it at a container element and it fills it.
+              </p>
+            </div>
+            <div class="card">
+              <h3>Real contacts</h3>
+              <p>
+                Verlet integration with positional relaxation over a uniform-grid
+                broadphase — cost scales with ball count, not its square.
+              </p>
+            </div>
+            <div class="card">
+              <h3>Sizes in pixels</h3>
+              <p>
+                Diameters are CSS pixels and are re-derived on every resize, so a
+                60&nbsp;px ball stays 60&nbsp;px whatever the viewport does.
+              </p>
+            </div>
+            <div class="card">
+              <h3>Polices its own frames</h3>
+              <p>
+                It times real frames and sheds balls if the median runs past your
+                budget. Deterministic seed, so the pour is identical every load.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="band" id="install">
+        <div class="wrap">
+          <h2>Install</h2>
+          <p class="muted">Not on npm yet — install from the repository:</p>
+          <pre><code>npm install github:ozdalgic/ballpit-js three</code></pre>
+          <p>
+            Or copy <code>src/ballpit.js</code> into your project; it is a single
+            module with three.js as its only dependency.
+          </p>
+
+          <h3>Use it</h3>
+          <pre><code><span class="tok-k">import</span> { createBallpit } <span class="tok-k">from</span> <span class="tok-s">'ballpit-js'</span>;
+
+createBallpit(document.querySelector(<span class="tok-s">'#hero-pit'</span>), {
+  count: <span class="tok-n">180</span>,
+  palette: [<span class="tok-s">'#eaf1ff'</span>, <span class="tok-s">'#2957ff'</span>, <span class="tok-s">'#00509f'</span>],
+});</code></pre>
+          <p>The container needs a size of its own — the canvas fills it:</p>
+          <pre><code>#hero-pit { position: absolute; inset: 0; z-index: 0; }</code></pre>
+
+          <h3>Without a build step</h3>
+          <p class="muted">
+            The module imports the bare specifier <code>three</code>, so a bundler
+            resolves it for you. Otherwise, an import map does the same job — this
+            page uses exactly that:
+          </p>
+          <pre><code>&lt;script type="importmap"&gt;
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.181.2/build/three.module.js"
+    }
+  }
+&lt;/script&gt;</code></pre>
+        </div>
+      </section>
+
+      <section class="band" id="options">
+        <div class="wrap">
+          <h2>Options</h2>
+          <div class="scroller">
+            <table>
+              <thead>
+                <tr><th>Option</th><th>Default</th><th>What it does</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>count</td><td>180</td><td class="plain">How many balls. Absolute, not a density — see <a href="#sizing">Sizing</a>.</td></tr>
+                <tr><td>minSize / maxSize</td><td>25 / 60</td><td class="plain">Ball diameters <strong>in CSS pixels</strong>, re-derived whenever the container resizes.</td></tr>
+                <tr><td>palette</td><td>3 blues</td><td class="plain">Colours cycled across the balls. Each gets a glossy and a frosted material.</td></tr>
+                <tr><td>gravity</td><td>11</td><td class="plain">Downward acceleration in world units/s².</td></tr>
+                <tr><td>drift</td><td>0</td><td class="plain">Sideways acceleration. Negative makes the pile lean and re-gather to the left.</td></tr>
+                <tr><td>pointer.radius</td><td>1.45</td><td class="plain">Size of the invisible disc the cursor drags through the pile (~157&nbsp;px).</td></tr>
+                <tr><td>pointer.strength</td><td>0.02</td><td class="plain">Shove budget per step. See <a href="#cursor">Tuning the cursor</a>.</td></tr>
+                <tr><td>envIntensity</td><td>0.45</td><td class="plain">Environment reflection. Raise for wetter, more mirror-like balls.</td></tr>
+                <tr><td>specular / clearcoat</td><td>0.3 / 0.12</td><td class="plain">Grazing-angle reflectance and the coat on top of it.</td></tr>
+                <tr><td>maxPixelRatio</td><td>1.5</td><td class="plain">DPR cap. The retina pass is the single biggest fragment cost.</td></tr>
+                <tr><td>autoQuality</td><td>true</td><td class="plain">Shed balls if frames run long. See <a href="#perf">Performance</a>.</td></tr>
+                <tr><td>budgetMs</td><td>8</td><td class="plain">The frame cost that counts as “too slow”.</td></tr>
+                <tr><td>seed</td><td>20260907</td><td class="plain">Fixed, so the pour is identical on every load.</td></tr>
+                <tr><td>respectReducedMotion</td><td>true</td><td class="plain">Render one settled frame instead of animating.</td></tr>
+                <tr><td>controls</td><td>false</td><td class="plain">Show the built-in tuning panel.</td></tr>
+                <tr><td>labels</td><td>English</td><td class="plain">Panel strings, for translating the UI.</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3>API</h3>
+          <pre><code><span class="tok-k">const</span> pit = createBallpit(el, options);
+
+pit.setCount(<span class="tok-n">240</span>);      <span class="tok-c">// add or remove balls; new ones rain in</span>
+pit.setSizes(<span class="tok-n">20</span>, <span class="tok-n">45</span>);   <span class="tok-c">// min/max diameter in CSS px</span>
+pit.repour();           <span class="tok-c">// replay the opening pour</span>
+pit.destroy();          <span class="tok-c">// remove listeners, dispose GPU resources, drop the canvas</span>
+pit.canvas;             <span class="tok-c">// the &lt;canvas&gt; element</span></code></pre>
+
+          <figure>
+            <img src="docs/controls.jpg" alt="The built-in tuning panel: sliders for count, sizes and cursor behaviour." />
+            <figcaption>
+              <code>controls: true</code> gives you sliders for count, sizes and
+              the cursor, plus a re-pour button. Useful while you dial a design
+              in — or keep it, it works fine as a toy for visitors.
+            </figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <section class="band" id="sizing">
+        <div class="wrap">
+          <h2>Sizing</h2>
+          <p>
+            <code>count</code> is a number of balls, not a density. The same value
+            reads as a shallow bed in a wide hero and a deep drift in a narrow
+            one, so pick it against your own container:
+          </p>
+          <div class="scroller">
+            <table>
+              <thead><tr><th>Container</th><th>Reads as</th></tr></thead>
+              <tbody>
+                <tr><td>~1400 × 640</td><td class="plain"><code>120</code> — a bed roughly two balls deep</td></tr>
+                <tr><td>~1900 × 580</td><td class="plain"><code>180</code> — the same depth across a wider hero</td></tr>
+                <tr><td>~2500 × 610</td><td class="plain"><code>180</code> — sparser, closer to a single layer</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="band" id="cursor">
+        <div class="wrap">
+          <h2>Tuning the cursor</h2>
+          <p>
+            <code>pointer.strength</code> is a hard cap on how far one ball may be
+            displaced in a single step. It has to be re-tuned when the packing
+            changes, and the useful range is narrow:
+          </p>
+          <ul>
+            <li class="muted">
+              Too high and a single drag bulldozes the whole bed into a mound —
+              and with <code>drift: 0</code> nothing ever undoes that.
+            </li>
+            <li class="muted">
+              Too low and a densely packed pile simply absorbs the push: neighbour
+              contacts cancel it out within the same step and nothing visibly
+              moves.
+            </li>
+          </ul>
+          <p>
+            The default (<code>0.02</code>, with <code>radius: 1.45</code>) shoves
+            nearby balls a few widths aside and leaves the bed's shape intact
+            across repeated drags. Measured against 180 balls in a 1900 × 580
+            container.
+          </p>
+        </div>
+      </section>
+
+      <section class="band" id="perf">
+        <div class="wrap">
+          <h2>Performance</h2>
+          <p>
+            Everything shares one sphere geometry and a handful of materials.
+            Measured on an M4 Max, step + render per frame:
+          </p>
+          <div class="scroller">
+            <table>
+              <thead><tr><th>Balls</th><th>ms / frame</th><th>Share of a 60&nbsp;fps budget</th></tr></thead>
+              <tbody>
+                <tr><td>120</td><td>0.22</td><td class="plain">1%</td></tr>
+                <tr><td>180</td><td>0.39</td><td class="plain">2%</td></tr>
+                <tr><td>400</td><td>0.77</td><td class="plain">5%</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="muted">
+            Those are one machine's numbers. A weak integrated GPU will be several
+            times slower, and the fragment cost — not the physics — is what bites.
+            <code>autoQuality</code> therefore times the real frames and drops to
+            60% of the balls if the median exceeds <code>budgetMs</code>. If you
+            expose the count slider to visitors, the safety net stands down as
+            soon as they touch it: their choice wins.
+          </p>
+
+          <h3>Accessibility</h3>
+          <ul>
+            <li class="muted"><code>prefers-reduced-motion: reduce</code> renders a single settled frame instead of animating.</li>
+            <li class="muted">The pit is decorative — give the container <code>aria-hidden="true"</code> and keep real content in normal DOM above it.</li>
+            <li class="muted">The canvas never takes pointer events from your content; it tracks the cursor from <code>window</code> instead.</li>
+          </ul>
+
+          <h3>Browser support</h3>
+          <p class="muted">
+            Any browser with WebGL2 and ES modules. If WebGL is unavailable,
+            <code>createBallpit</code> warns and returns a no-op controller rather
+            than throwing, so the page is unaffected.
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="wrap">
+        MIT © <a href="https://ozdalgic.com">Aytaç Özdalgıç</a> ·
+        <a href="https://github.com/ozdalgic/ballpit-js">Source</a> ·
+        <a href="https://github.com/ozdalgic/ballpit-js/issues">Issues</a>
+      </div>
+    </footer>
+
+    <script type="module">
+      import { createBallpit } from './src/ballpit.js';
+
+      const el = document.getElementById('pit');
+      const narrow = window.matchMedia('(max-width: 760px)');
+
+      // `count` is absolute, not a density — the same number that reads as a
+      // two-ball-deep bed at 1440px buries a phone-width hero completely. So
+      // the page picks its own numbers per breakpoint, which is the same call
+      // any site embedding this has to make.
+      //
+      // The panel is desktop-only on purpose: a touch screen has no cursor to
+      // push the pile with, and at 390px the panel would cover the headline.
+      function optionsFor(isNarrow) {
+        return isNarrow
+          ? { count: 42, minSize: 18, maxSize: 42, controls: false }
+          : { count: 130, minSize: 25, maxSize: 60, controls: true };
+      }
+
+      let pit = createBallpit(el, {
+        palette: ['#eaf1ff', '#2957ff', '#00509f'],
+        ...optionsFor(narrow.matches),
+      });
+
+      // Crossing the breakpoint (a rotation, a resized window) needs a new pit:
+      // count and sizes are set at construction, not adjustable per frame.
+      narrow.addEventListener('change', (e) => {
+        pit.destroy();
+        pit = createBallpit(el, {
+          palette: ['#eaf1ff', '#2957ff', '#00509f'],
+          ...optionsFor(e.matches),
+        });
+      });
+    </script>
+  </body>
+</html>
