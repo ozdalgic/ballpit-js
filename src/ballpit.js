@@ -46,6 +46,13 @@ const DEFAULTS = {
   respectReducedMotion: true,
   /** Show the tuning panel. Handy while dialling a design in. */
   controls: false,
+  /**
+   * Where to mount that panel. Leave null and the library picks: the container
+   * itself, or — when the container is its own stacking context, as the
+   * documented CSS makes it — the container's positioned ancestor, so the
+   * panel is not trapped underneath content drawn over the pit.
+   */
+  controlsTarget: null,
   labels: {
     title: 'Ballpit',
     count: 'Count',
@@ -459,9 +466,52 @@ export function createBallpit(target, userOptions = {}) {
     applySizes();
   }
 
+  /**
+   * Where the panel is mounted.
+   *
+   * Not `target`, by default. The container CSS this library asks for
+   * (`position:absolute; inset:0; z-index:0`) makes the container its own
+   * stacking context, and a panel inside it can never paint above content
+   * drawn over the pit however high its own z-index is. Anywhere that content
+   * overlaps the panel, the panel stops receiving clicks — visible, but dead.
+   *
+   * So when the container is a stacking context, mount into its positioned
+   * ancestor instead: in the documented layout that is the same box, and the
+   * panel is then a sibling of the content rather than trapped beneath it.
+   * `controlsTarget` overrides all of this.
+   */
+  function resolveControlsHost() {
+    if (options.controlsTarget) return options.controlsTarget;
+    const parent = target.parentElement;
+    if (!parent) return target;
+    if (getComputedStyle(target).zIndex === 'auto') return target;
+    return getComputedStyle(parent).position !== 'static' ? parent : target;
+  }
+
+  /** Keep the panel over the pit when it is mounted on a larger ancestor. */
+  function placePanel() {
+    if (!panel || panel.host === target) return;
+    const t = target.getBoundingClientRect();
+    const h = panel.host.getBoundingClientRect();
+    panel.root.style.top = t.top - h.top + PANEL_INSET + 'px';
+    panel.root.style.left = t.left - h.left + PANEL_INSET + 'px';
+  }
+
+  const PANEL_INSET = 14;
+  let panelObserver = null;
+
   if (options.controls) {
     panel = buildPanel();
-    target.appendChild(panel.root);
+    panel.host = resolveControlsHost();
+    panel.host.appendChild(panel.root);
+    placePanel();
+    // Only needed when the panel sits on an ancestor: the offset between the
+    // two boxes can change without either of them being replaced.
+    if (panel.host !== target && typeof ResizeObserver === 'function') {
+      panelObserver = new ResizeObserver(placePanel);
+      panelObserver.observe(target);
+      panelObserver.observe(panel.host);
+    }
   }
 
   function buildPanel() {
@@ -672,6 +722,7 @@ export function createBallpit(target, userOptions = {}) {
       document.removeEventListener('mouseleave', onPointerOut);
       if (resizeObserver) resizeObserver.disconnect();
       else window.removeEventListener('resize', resize);
+      if (panelObserver) panelObserver.disconnect();
       if (panel && panel.root.parentNode) panel.root.parentNode.removeChild(panel.root);
       geometry.dispose();
       grainTexture.dispose();
