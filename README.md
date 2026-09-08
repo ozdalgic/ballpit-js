@@ -2,7 +2,9 @@
 
 An interactive pit of spheres for hero sections. Balls rain into the container, settle into a real pile, and scatter when the cursor pushes through them.
 
-![ballpit-js](docs/preview.jpg)
+**[→ Try it live](https://ozdalgic.github.io/ballpit-js/)**
+
+[![ballpit-js](docs/preview.jpg)](https://ozdalgic.github.io/ballpit-js/)
 
 No canvas library to learn, no physics engine to bundle: one function, one container element, [three.js](https://threejs.org) as the only dependency.
 
